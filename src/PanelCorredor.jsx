@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Banknote, LogOut } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Banknote, LogOut, User } from 'lucide-react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
 import Icono from './Icono'
@@ -21,6 +21,17 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [perfilAbierto, setPerfilAbierto] = useState(false)
+  const perfilRef = useRef(null)
+
+  useEffect(() => {
+    if (!perfilAbierto) return undefined
+    function cerrar(event) {
+      if (!perfilRef.current?.contains(event.target)) setPerfilAbierto(false)
+    }
+    document.addEventListener('pointerdown', cerrar)
+    return () => document.removeEventListener('pointerdown', cerrar)
+  }, [perfilAbierto])
 
   const dinero = (monto) => formatoMoneda(monto, panel?.moneda || 'COP')
   const deudasCliente = (panel?.deudas || []).filter(
@@ -94,41 +105,53 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
         <img className="logo logo-barra" src={logo} alt="GotaApp" />
         <div className="barra-titulo">
           <p className="barra-sistema">Sistema de gestión gota gota</p>
-          <p className="barra-usuario">{panel.usuario.nombre} · corredor</p>
+          <p className="barra-usuario">{panel.usuario.nombre}</p>
         </div>
-        <button className="button button-salir" type="button" onClick={onSalir}>
-          <Icono icono={LogOut} size={16} />
-          Salir
-        </button>
+        <div className="perfil" ref={perfilRef}>
+          <button
+            className="button button-perfil"
+            type="button"
+            aria-label="Mi información"
+            aria-expanded={perfilAbierto}
+            onClick={() => setPerfilAbierto((abierto) => !abierto)}
+          >
+            <Icono icono={User} size={18} />
+          </button>
+          {perfilAbierto ? (
+            <div className="menu-perfil">
+              <p className="menu-perfil-titulo">Mi información</p>
+              <dl className="datos-corredor">
+                <div>
+                  <dt>Nombre</dt>
+                  <dd>{panel.usuario.nombre}</dd>
+                </div>
+                <div>
+                  <dt>Correo</dt>
+                  <dd>{panel.usuario.correo}</dd>
+                </div>
+                <div>
+                  <dt>Teléfono</dt>
+                  <dd>{panel.usuario.telefono || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Documento</dt>
+                  <dd>{panel.usuario.documento || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Zona</dt>
+                  <dd>{panel.usuario.zona || '—'}</dd>
+                </div>
+              </dl>
+              <button className="button button-salir" type="button" onClick={onSalir}>
+                <Icono icono={LogOut} size={16} />
+                Cerrar sesión
+              </button>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       <main className="contenido">
-        <section className="panel">
-          <h1>Mi información</h1>
-          <dl className="datos-corredor">
-            <div>
-              <dt>Nombre</dt>
-              <dd>{panel.usuario.nombre}</dd>
-            </div>
-            <div>
-              <dt>Correo</dt>
-              <dd>{panel.usuario.correo}</dd>
-            </div>
-            <div>
-              <dt>Teléfono</dt>
-              <dd>{panel.usuario.telefono || '—'}</dd>
-            </div>
-            <div>
-              <dt>Documento</dt>
-              <dd>{panel.usuario.documento || '—'}</dd>
-            </div>
-            <div>
-              <dt>Zona</dt>
-              <dd>{panel.usuario.zona || '—'}</dd>
-            </div>
-          </dl>
-        </section>
-
         {aviso ? <p className="aviso">{aviso}</p> : null}
 
         <section className="panel lista">

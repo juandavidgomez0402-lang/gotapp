@@ -411,6 +411,41 @@
   font-weight: 700;
 }
 
+.perfil {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.button-perfil {
+  width: 44px;
+  height: 44px;
+  margin-top: 0;
+  padding: 0;
+  background: var(--white);
+}
+
+.menu-perfil {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(280px, calc(100vw - 24px));
+  border: 1px solid var(--line);
+  background: var(--white);
+  padding: 16px;
+}
+
+.menu-perfil-titulo {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.menu-perfil .button-salir {
+  width: 100%;
+  margin-top: 16px;
+}
+
 .datos-corredor {
   display: grid;
   gap: 12px;
