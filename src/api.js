@@ -1,3 +1,5 @@
+export const API = 'https://apigotapp.nodefex.com'
+
 export async function pedir(ruta, opciones = {}) {
   const headers = {}
   if (opciones.datos) headers['Content-Type'] = 'application/json'
@@ -5,7 +7,7 @@ export async function pedir(ruta, opciones = {}) {
 
   let respuesta
   try {
-    respuesta = await fetch(ruta, {
+    respuesta = await fetch(`${API}${ruta}`, {
       method: opciones.method || 'GET',
       headers,
       body: opciones.datos ? JSON.stringify(opciones.datos) : undefined,
