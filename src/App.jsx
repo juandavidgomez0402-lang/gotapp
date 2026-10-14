@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { LogIn, UserPlus } from 'lucide-react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
+import Icono from './Icono'
 import Dashboard from './Dashboard'
 import './App.css'
 
@@ -174,9 +176,11 @@ function App() {
 
         <div className="botones-dobles">
           <button className="button" type="submit" disabled={ingresando}>
+            <Icono icono={LogIn} size={16} />
             {ingresando ? 'Ingresando...' : 'Ingresar'}
           </button>
           <button className="button button-secondary" type="button" onClick={abrirRegistro}>
+            <Icono icono={UserPlus} size={16} />
             Crear cuenta
           </button>
         </div>

@@ -1,8 +1,37 @@
 import { useEffect, useState } from 'react'
+import {
+  Banknote,
+  CalendarRange,
+  ChevronDown,
+  HandCoins,
+  LogOut,
+  Pencil,
+  Receipt,
+  Route,
+  Settings,
+  Sun,
+  Sunrise,
+  UserPlus,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
 import { pendientes } from './cobros'
+import Icono from './Icono'
 import { formatoMoneda, MONEDAS } from './moneda'
+
+function Resumen({ icono, children }) {
+  return (
+    <summary>
+      <span className="resumen-titulo">
+        <Icono icono={icono} />
+        <h2>{children}</h2>
+      </span>
+      <Icono icono={ChevronDown} className="flecha" />
+    </summary>
+  )
+}
 
 const vacioCliente = {
   nombrePersonal: '',
@@ -417,13 +446,16 @@ export default function Dashboard({ token, onSalir }) {
           </p>
         </div>
         <button className="button button-salir" type="button" onClick={onSalir}>
+          <Icono icono={LogOut} size={16} />
           Salir
         </button>
       </header>
 
       <main className="contenido">
-        <section className="panel">
-          <h1>Configuración</h1>
+        <section className="panel lista lista-desplegable">
+          <details>
+            <Resumen icono={Settings}>Configuración</Resumen>
+            <div className="lista-cuerpo">
           <div className="field">
             <label htmlFor="moneda">Formato de moneda</label>
             <select
@@ -467,6 +499,8 @@ export default function Dashboard({ token, onSalir }) {
           ) : (
             <p className="nota">Aún no hay porcentajes.</p>
           )}
+            </div>
+          </details>
         </section>
 
         {error ? (
@@ -479,22 +513,29 @@ export default function Dashboard({ token, onSalir }) {
         {esAdministrador ? (
           <div className="acciones">
             <button className="button button-ajuste" type="button" onClick={() => abrirModal('ruta')}>
+              <Icono icono={Route} size={16} />
               Crear ruta
             </button>
             <button className="button button-secundario-linea" type="button" onClick={() => abrirModal('corredor')}>
+              <Icono icono={UserPlus} size={16} />
               Crear corredor
             </button>
             <button className="button button-ajuste" type="button" onClick={() => abrirModal('cliente')}>
+              <Icono icono={Users} size={16} />
               Crear cliente
             </button>
             <button className="button button-secundario-linea" type="button" onClick={() => abrirModal('deuda')}>
+              <Icono icono={Wallet} size={16} />
               Crear deuda
             </button>
           </div>
         ) : null}
 
         <section className="panel lista">
-          <h2>Rutas</h2>
+          <h2 className="resumen-titulo">
+            <Icono icono={Route} />
+            Rutas
+          </h2>
           {panel?.rutas?.length ? (
             <ul>
               {panel.rutas.map((ruta) => (
@@ -502,6 +543,7 @@ export default function Dashboard({ token, onSalir }) {
                   <span>{ruta.nombre}</span>
                   {esAdministrador ? (
                     <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('ruta', ruta)}>
+                      <Icono icono={Pencil} size={15} />
                       Editar
                     </button>
                   ) : null}
@@ -515,16 +557,14 @@ export default function Dashboard({ token, onSalir }) {
 
         <section className="panel lista lista-desplegable">
           <details>
-            <summary>
-              <h2>Pendientes por cobrar</h2>
-            </summary>
+            <Resumen icono={HandCoins}>Pendientes por cobrar</Resumen>
             <div className="lista-cuerpo">
               <div className="filtros-cobro" role="group" aria-label="Filtrar cobros">
                 {[
-                  ['hoy', 'Hoy'],
-                  ['manana', 'Mañana'],
-                  ['semana', 'Esta semana'],
-                ].map(([valor, etiqueta]) => (
+                  ['hoy', 'Hoy', Sun],
+                  ['manana', 'Mañana', Sunrise],
+                  ['semana', 'Esta semana', CalendarRange],
+                ].map(([valor, etiqueta, icono]) => (
                   <button
                     key={valor}
                     className={`button button-secondary${filtroCobro === valor ? ' filtro-activo' : ''}`}
@@ -532,6 +572,7 @@ export default function Dashboard({ token, onSalir }) {
                     aria-pressed={filtroCobro === valor}
                     onClick={() => setFiltroCobro(valor)}
                   >
+                    <Icono icono={icono} size={15} />
                     {etiqueta}
                   </button>
                 ))}
@@ -558,9 +599,7 @@ export default function Dashboard({ token, onSalir }) {
 
         <section className="panel lista lista-desplegable">
           <details>
-            <summary>
-              <h2>Deudas</h2>
-            </summary>
+            <Resumen icono={Receipt}>Deudas</Resumen>
             <div className="lista-cuerpo">
               {panel?.deudas?.length ? (
                 <ul>
@@ -577,6 +616,7 @@ export default function Dashboard({ token, onSalir }) {
                       </span>
                       {esAdministrador ? (
                         <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('deuda', item)}>
+                          <Icono icono={Pencil} size={15} />
                           Editar
                         </button>
                       ) : null}
@@ -592,9 +632,7 @@ export default function Dashboard({ token, onSalir }) {
 
         <section className="panel lista lista-desplegable">
           <details>
-            <summary>
-              <h2>Clientes</h2>
-            </summary>
+            <Resumen icono={Users}>Clientes</Resumen>
             <div className="lista-cuerpo">
               {panel?.clientes?.length ? (
                 <ul>
@@ -621,12 +659,14 @@ export default function Dashboard({ token, onSalir }) {
                       {esAdministrador ? (
                         <div className="acciones-item">
                           <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('cliente', persona)}>
+                            <Icono icono={Pencil} size={15} />
                             Editar
                           </button>
                           {(panel?.deudas || []).some(
                             (item) => item.cliente_id === persona.id && item.estado !== 'cancelada' && Number(item.saldo) > 0,
                           ) ? (
                             <button className="button button-editar" type="button" onClick={() => abrirAbono(persona)}>
+                              <Icono icono={Banknote} size={15} />
                               Abonar
                             </button>
                           ) : null}
@@ -644,9 +684,7 @@ export default function Dashboard({ token, onSalir }) {
 
         <section className="panel lista lista-desplegable">
           <details>
-            <summary>
-              <h2>Corredores</h2>
-            </summary>
+            <Resumen icono={UserPlus}>Corredores</Resumen>
             <div className="lista-cuerpo">
               {panel?.corredores?.length ? (
                 <ul>
@@ -659,6 +697,7 @@ export default function Dashboard({ token, onSalir }) {
                       <span>{persona.zona}</span>
                       {esAdministrador ? (
                         <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('corredor', persona)}>
+                          <Icono icono={Pencil} size={15} />
                           Editar
                         </button>
                       ) : null}
