@@ -20,6 +20,7 @@ import { pedir } from './api'
 import { pendientes } from './cobros'
 import Icono from './Icono'
 import { formatoMoneda, MONEDAS } from './moneda'
+import PanelCorredor from './PanelCorredor'
 
 function Resumen({ icono, children }) {
   return (
@@ -99,6 +100,8 @@ export default function Dashboard({ token, onSalir }) {
   const [guardando, setGuardando] = useState(false)
   const [modal, setModal] = useState('')
   const [nombreRuta, setNombreRuta] = useState('')
+  const [corredorRuta, setCorredorRuta] = useState('')
+  const [clientesRuta, setClientesRuta] = useState([])
   const [corredor, setCorredor] = useState(vacioCorredor)
   const [cliente, setCliente] = useState(vacioCliente)
   const [deuda, setDeuda] = useState(vacioDeuda)
@@ -113,6 +116,13 @@ export default function Dashboard({ token, onSalir }) {
   const codigoMoneda = panel?.moneda || 'COP'
   const dinero = (valor) => formatoMoneda(valor, codigoMoneda)
   const cobros = pendientes(panel?.deudas, filtroCobro)
+  const clientesRutaDisponibles = (panel?.clientes || []).filter(
+    (persona) =>
+      (panel?.deudas || []).some((item) => item.cliente_id === persona.id && item.estado === 'activa') &&
+      !(panel?.rutas || []).some(
+        (ruta) => ruta.id !== editandoId && (ruta.clientes || []).some((cliente) => cliente.id === persona.id),
+      ),
+  )
   const textoBusqueda = deuda.busqueda.trim().toLowerCase()
   const sugerencias = textoBusqueda
     ? (panel?.clientes || []).filter((persona) => coincideCliente(persona, textoBusqueda))
@@ -226,6 +236,8 @@ export default function Dashboard({ token, onSalir }) {
     setErrorModal('')
     setEditandoId('')
     setNombreRuta('')
+    setCorredorRuta('')
+    setClientesRuta([])
     setCorredor(vacioCorredor)
     setCliente(vacioCliente)
     setDeuda({ ...vacioDeuda, fecha: fechaHoy() })
@@ -237,7 +249,11 @@ export default function Dashboard({ token, onSalir }) {
     setErrorModal('')
     setMostrarSugerencias(false)
     setEditandoId(item.id)
-    if (tipo === 'ruta') setNombreRuta(item.nombre || '')
+    if (tipo === 'ruta') {
+      setNombreRuta(item.nombre || '')
+      setCorredorRuta(item.corredor_id || '')
+      setClientesRuta((item.clientes || []).map((cliente) => cliente.id))
+    }
     if (tipo === 'cliente') {
       setCliente({
         nombrePersonal: item.nombre_personal || '',
@@ -288,8 +304,8 @@ export default function Dashboard({ token, onSalir }) {
 
   async function crearRuta(event) {
     event.preventDefault()
-    if (!nombreRuta.trim()) {
-      setErrorModal('Escribe el nombre de la ruta.')
+    if (!nombreRuta.trim() || !corredorRuta || !clientesRuta.length) {
+      setErrorModal('Escribe el nombre, asigna un corredor y añade clientes con deuda activa.')
       return
     }
     setCreando(true)
@@ -298,7 +314,11 @@ export default function Dashboard({ token, onSalir }) {
       await pedir(editandoId ? `/api/rutas/${editandoId}` : '/api/rutas', {
         method: editandoId ? 'PUT' : 'POST',
         token,
-        datos: { nombre: nombreRuta.trim() },
+        datos: {
+          nombre: nombreRuta.trim(),
+          corredorId: corredorRuta,
+          clienteIds: clientesRuta,
+        },
       })
       await cargar()
       setModal('')
@@ -435,6 +455,10 @@ export default function Dashboard({ token, onSalir }) {
     }
   }
 
+  if (panel?.usuario?.rol === 'corredor') {
+    return <PanelCorredor panel={panel} token={token} onSalir={onSalir} onActualizar={cargar} />
+  }
+
   return (
     <div className="app-dashboard">
       <header className="barra">
@@ -541,6 +565,10 @@ export default function Dashboard({ token, onSalir }) {
               {panel.rutas.map((ruta) => (
                 <li key={ruta.id}>
                   <span>{ruta.nombre}</span>
+                  <span>{ruta.corredor_nombre || 'Sin corredor'}</span>
+                  <span>
+                    {(ruta.clientes || []).map((cliente) => cliente.nombre_personal).join(', ') || 'Sin clientes'}
+                  </span>
                   {esAdministrador ? (
                     <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('ruta', ruta)}>
                       <Icono icono={Pencil} size={15} />
@@ -607,7 +635,9 @@ export default function Dashboard({ token, onSalir }) {
                     <li key={item.id}>
                       <strong>{item.nombre_personal}</strong>
                       <span>{item.nombre_negocio}</span>
-                      <span>{item.estado === 'cancelada' ? 'Cancelada' : 'Activa'}</span>
+                      <span className={item.estado === 'cancelada' ? 'estado-cancelada' : 'estado-activa'}>
+                        {item.estado === 'cancelada' ? 'Cancelada' : 'Activa'}
+                      </span>
                       <span>
                         Préstamo {dinero(item.valor_prestamo)} · {item.numero_cuotas} cuotas {item.plazo}
                       </span>
@@ -645,7 +675,7 @@ export default function Dashboard({ token, onSalir }) {
                       {(panel?.deudas || [])
                         .filter((item) => item.cliente_id === persona.id)
                         .map((item) => (
-                          <span key={item.id}>
+                          <span key={item.id} className={item.estado === 'cancelada' ? 'estado-cancelada' : 'estado-activa'}>
                             Deuda {item.estado === 'cancelada' ? 'cancelada' : 'activa'} · Saldo {dinero(item.saldo)}
                           </span>
                         ))}
@@ -735,6 +765,47 @@ export default function Dashboard({ token, onSalir }) {
                 value={nombreRuta}
                 onChange={(event) => setNombreRuta(event.target.value)}
               />
+            </div>
+            <div className="field">
+              <label htmlFor="corredor-ruta">Corredor</label>
+              <select
+                id="corredor-ruta"
+                name="corredorId"
+                value={corredorRuta}
+                onChange={(event) => setCorredorRuta(event.target.value)}
+              >
+                <option value="">Selecciona un corredor</option>
+                {(panel?.corredores || []).map((persona) => (
+                  <option key={persona.id} value={persona.id}>
+                    {persona.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <p className="etiqueta" id="clientes-ruta-titulo">Clientes con deuda activa</p>
+              <div className="opciones-clientes" role="group" aria-labelledby="clientes-ruta-titulo">
+                {clientesRutaDisponibles.length ? clientesRutaDisponibles.map((persona) => (
+                    <label key={persona.id} className="opcion-cliente">
+                      <input
+                        type="checkbox"
+                        checked={clientesRuta.includes(persona.id)}
+                        onChange={() =>
+                          setClientesRuta((actual) =>
+                            actual.includes(persona.id)
+                              ? actual.filter((id) => id !== persona.id)
+                              : [...actual, persona.id],
+                          )
+                        }
+                      />
+                      <span>
+                        {persona.nombre_personal} · {persona.nombre_negocio}
+                      </span>
+                    </label>
+                  )) : (
+                  <p className="nota">No hay clientes con deuda activa disponibles.</p>
+                )}
+              </div>
             </div>
             {errorModal ? (
               <p className="error" role="alert">

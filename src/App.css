@@ -378,6 +378,108 @@
   flex: 0 0 auto;
 }
 
+.estado-activa {
+  color: #128a3e;
+  font-weight: 700;
+}
+
+.estado-cancelada {
+  color: #1a5fd0;
+  font-weight: 700;
+}
+
+.opciones-clientes {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  padding: 10px;
+}
+
+.opcion-cliente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.etiqueta {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.datos-corredor {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.datos-corredor div {
+  display: grid;
+  gap: 2px;
+}
+
+.datos-corredor dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.datos-corredor dd {
+  margin: 0;
+}
+
+.tabla-contenedor {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla th,
+.tabla td {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tabla th {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tabla-detalle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85rem;
+}
+
+.tabla .button-editar {
+  margin-top: 0;
+}
+
+.opciones-clientes .nota {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.opcion-cliente input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--orange);
+}
+
 .lista-desplegable summary:focus {
   outline: 3px solid var(--orange);
   outline-offset: -3px;
