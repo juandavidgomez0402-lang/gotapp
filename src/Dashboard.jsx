@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
+import { pendientes } from './cobros'
+import { formatoMoneda, MONEDAS } from './moneda'
 
 const vacioCliente = {
   nombrePersonal: '',
@@ -72,11 +74,16 @@ export default function Dashboard({ token, onSalir }) {
   const [cliente, setCliente] = useState(vacioCliente)
   const [deuda, setDeuda] = useState(vacioDeuda)
   const [mostrarSugerencias, setMostrarSugerencias] = useState(false)
+  const [filtroCobro, setFiltroCobro] = useState('hoy')
+  const [abono, setAbono] = useState({ deudaId: '', valor: '', fecha: '' })
   const [editandoId, setEditandoId] = useState('')
   const [errorModal, setErrorModal] = useState('')
   const [creando, setCreando] = useState(false)
 
   const esAdministrador = panel?.usuario?.rol === 'administrador'
+  const codigoMoneda = panel?.moneda || 'COP'
+  const dinero = (valor) => formatoMoneda(valor, codigoMoneda)
+  const cobros = pendientes(panel?.deudas, filtroCobro)
   const textoBusqueda = deuda.busqueda.trim().toLowerCase()
   const sugerencias = textoBusqueda
     ? (panel?.clientes || []).filter((persona) => coincideCliente(persona, textoBusqueda))
@@ -124,6 +131,65 @@ export default function Dashboard({ token, onSalir }) {
       setError(guardadoError.message)
     } finally {
       setGuardando(false)
+    }
+  }
+
+  async function guardarMoneda(codigo) {
+    setAviso('')
+    setError('')
+    try {
+      await pedir('/api/moneda', {
+        method: 'PUT',
+        token,
+        datos: { moneda: codigo },
+      })
+      await cargar()
+    } catch (monedaError) {
+      setError(monedaError.message)
+    }
+  }
+
+  function abrirAbono(persona) {
+    const activas = (panel?.deudas || []).filter(
+      (item) => item.cliente_id === persona.id && item.estado !== 'cancelada' && Number(item.saldo) > 0,
+    )
+    setErrorModal('')
+    setEditandoId('')
+    setAbono({
+      clienteId: persona.id,
+      deudaId: activas[0]?.id || '',
+      valor: '',
+      fecha: fechaHoy(),
+    })
+    setModal('abono')
+  }
+
+  async function crearAbono(event) {
+    event.preventDefault()
+    if (!abono.deudaId || !abono.valor || !abono.fecha) {
+      setErrorModal('Selecciona la deuda, el valor y la fecha del abono.')
+      return
+    }
+    setCreando(true)
+    setErrorModal('')
+    try {
+      const resultado = await pedir('/api/abonos', {
+        method: 'POST',
+        token,
+        datos: {
+          deudaId: abono.deudaId,
+          valor: abono.valor,
+          fecha: abono.fecha,
+        },
+      })
+      await cargar()
+      setModal('')
+      setAviso(resultado.estado === 'cancelada' ? 'Deuda cancelada.' : 'Abono registrado.')
+      setError('')
+    } catch (abonoError) {
+      setErrorModal(abonoError.message)
+    } finally {
+      setCreando(false)
     }
   }
 
@@ -357,7 +423,23 @@ export default function Dashboard({ token, onSalir }) {
 
       <main className="contenido">
         <section className="panel">
-          <h1>Intereses</h1>
+          <h1>Configuración</h1>
+          <div className="field">
+            <label htmlFor="moneda">Formato de moneda</label>
+            <select
+              id="moneda"
+              name="moneda"
+              value={codigoMoneda}
+              onChange={(event) => guardarMoneda(event.target.value)}
+              disabled={!esAdministrador}
+            >
+              {MONEDAS.map(([codigo, etiqueta]) => (
+                <option key={codigo} value={codigo}>
+                  {etiqueta}
+                </option>
+              ))}
+            </select>
+          </div>
           <form onSubmit={guardarInteres} noValidate>
             <div className="field">
               <label htmlFor="porcentaje">Porcentaje de interés</label>
@@ -434,6 +516,49 @@ export default function Dashboard({ token, onSalir }) {
         <section className="panel lista lista-desplegable">
           <details>
             <summary>
+              <h2>Pendientes por cobrar</h2>
+            </summary>
+            <div className="lista-cuerpo">
+              <div className="filtros-cobro" role="group" aria-label="Filtrar cobros">
+                {[
+                  ['hoy', 'Hoy'],
+                  ['manana', 'Mañana'],
+                  ['semana', 'Esta semana'],
+                ].map(([valor, etiqueta]) => (
+                  <button
+                    key={valor}
+                    className={`button button-secondary${filtroCobro === valor ? ' filtro-activo' : ''}`}
+                    type="button"
+                    aria-pressed={filtroCobro === valor}
+                    onClick={() => setFiltroCobro(valor)}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+              </div>
+              {cobros.length ? (
+                <ul>
+                  {cobros.map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.nombre}</strong>
+                      <span>{item.negocio}</span>
+                      <span>
+                        {item.fecha} · {item.plazo}
+                      </span>
+                      <span>{dinero(item.valor)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No hay cobros para este periodo.</p>
+              )}
+            </div>
+          </details>
+        </section>
+
+        <section className="panel lista lista-desplegable">
+          <details>
+            <summary>
               <h2>Deudas</h2>
             </summary>
             <div className="lista-cuerpo">
@@ -443,10 +568,13 @@ export default function Dashboard({ token, onSalir }) {
                     <li key={item.id}>
                       <strong>{item.nombre_personal}</strong>
                       <span>{item.nombre_negocio}</span>
+                      <span>{item.estado === 'cancelada' ? 'Cancelada' : 'Activa'}</span>
                       <span>
-                        Préstamo {item.valor_prestamo} · {item.numero_cuotas} cuotas {item.plazo}
+                        Préstamo {dinero(item.valor_prestamo)} · {item.numero_cuotas} cuotas {item.plazo}
                       </span>
-                      <span>Cuota {item.valor_cuota} · {String(item.fecha).slice(0, 10)}</span>
+                      <span>
+                        Cuota {dinero(item.valor_cuota)} · Saldo {dinero(item.saldo)} · {String(item.fecha).slice(0, 10)}
+                      </span>
                       {esAdministrador ? (
                         <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('deuda', item)}>
                           Editar
@@ -476,10 +604,33 @@ export default function Dashboard({ token, onSalir }) {
                       <span>{persona.nombre_negocio}</span>
                       <span>{persona.telefono_1}</span>
                       <span>{persona.direccion}</span>
+                      {(panel?.deudas || [])
+                        .filter((item) => item.cliente_id === persona.id)
+                        .map((item) => (
+                          <span key={item.id}>
+                            Deuda {item.estado === 'cancelada' ? 'cancelada' : 'activa'} · Saldo {dinero(item.saldo)}
+                          </span>
+                        ))}
+                      {(panel?.abonos || [])
+                        .filter((item) => item.cliente_id === persona.id)
+                        .map((item) => (
+                          <span key={item.id}>
+                            Abono {dinero(item.valor)} · {item.fecha}
+                          </span>
+                        ))}
                       {esAdministrador ? (
-                        <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('cliente', persona)}>
-                          Editar
-                        </button>
+                        <div className="acciones-item">
+                          <button className="button button-secondary button-editar" type="button" onClick={() => abrirEdicion('cliente', persona)}>
+                            Editar
+                          </button>
+                          {(panel?.deudas || []).some(
+                            (item) => item.cliente_id === persona.id && item.estado !== 'cancelada' && Number(item.saldo) > 0,
+                          ) ? (
+                            <button className="button button-editar" type="button" onClick={() => abrirAbono(persona)}>
+                              Abonar
+                            </button>
+                          ) : null}
+                        </div>
                       ) : null}
                     </li>
                   ))}
@@ -690,7 +841,7 @@ export default function Dashboard({ token, onSalir }) {
               </div>
             </div>
             <p className="cuota-calculada">
-              Valor de la cuota: {cuotaCalculada(deuda) || '—'}
+              Valor de la cuota: {cuotaCalculada(deuda) ? dinero(cuotaCalculada(deuda)) : '—'}
             </p>
             {errorModal ? (
               <p className="error" role="alert">
@@ -883,6 +1034,79 @@ export default function Dashboard({ token, onSalir }) {
               </button>
               <button className="button" type="submit" disabled={creando}>
                 {creando ? 'Guardando...' : editandoId ? 'Guardar' : 'Crear corredor'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {modal === 'abono' ? (
+        <div className="overlay" onClick={() => setModal('')}>
+          <form
+            className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-abono"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={crearAbono}
+            noValidate
+          >
+            <header className="modal-header">
+              <h2 id="titulo-abono">Registrar abono</h2>
+            </header>
+            <div className="field">
+              <label htmlFor="deuda-abono">Deuda</label>
+              <select
+                id="deuda-abono"
+                name="deudaId"
+                value={abono.deudaId}
+                onChange={(event) => setAbono((actual) => ({ ...actual, deudaId: event.target.value }))}
+              >
+                {(panel?.deudas || [])
+                  .filter(
+                    (item) =>
+                      item.cliente_id === abono.clienteId && item.estado !== 'cancelada' && Number(item.saldo) > 0,
+                  )
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nombre_personal} · Saldo {dinero(item.saldo)}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            <div className="campos-dobles">
+              <div className="field">
+                <label htmlFor="valor-abono">Valor</label>
+                <input
+                  id="valor-abono"
+                  name="valor"
+                  inputMode="decimal"
+                  value={abono.valor}
+                  onChange={(event) => setAbono((actual) => ({ ...actual, valor: event.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="fecha-abono">Fecha</label>
+                <input
+                  id="fecha-abono"
+                  name="fecha"
+                  type="date"
+                  value={abono.fecha}
+                  onChange={(event) => setAbono((actual) => ({ ...actual, fecha: event.target.value }))}
+                />
+              </div>
+            </div>
+            {errorModal ? (
+              <p className="error" role="alert">
+                {errorModal}
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button className="button button-secondary" type="button" onClick={() => setModal('')} disabled={creando}>
+                Cancelar
+              </button>
+              <button className="button" type="submit" disabled={creando}>
+                {creando ? 'Guardando...' : 'Registrar'}
               </button>
             </div>
           </form>

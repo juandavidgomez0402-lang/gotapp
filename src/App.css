@@ -458,6 +458,35 @@
   letter-spacing: 0.04em;
 }
 
+.acciones-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acciones-item .button-editar {
+  margin-top: 8px;
+}
+
+.filtros-cobro {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.filtros-cobro .button {
+  width: 100%;
+  height: 40px;
+  margin-top: 0;
+  padding: 0 8px;
+  letter-spacing: 0.03em;
+}
+
+.filtro-activo {
+  background: var(--orange);
+}
+
 .lista p {
   margin: 16px 0 0;
 }
@@ -528,6 +557,11 @@
   .lista-cuerpo {
     padding-right: 16px;
     padding-left: 16px;
+  }
+
+  .filtros-cobro .button {
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
   }
 
   .login {
