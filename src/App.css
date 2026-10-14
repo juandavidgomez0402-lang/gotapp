@@ -286,6 +286,42 @@
   background: var(--white);
 }
 
+.marcadores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+
+.marcadores-tres {
+  width: min(720px, 100%);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.marcador {
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--orange);
+  background: var(--white);
+  padding: 12px;
+}
+
+.marcador span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.marcador strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
+}
+
 .contenido {
   width: min(720px, 100%);
   margin: 0 auto;
@@ -682,6 +718,15 @@
 
   .panel form .button-ajuste {
     width: calc(50% - 6px);
+  }
+
+  .marcadores {
+    grid-template-columns: 1fr 1fr;
+    padding: 12px 12px 0;
+  }
+
+  .marcador strong {
+    font-size: 0.95rem;
   }
 
   .contenido {

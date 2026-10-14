@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Banknote, LogOut, User } from 'lucide-react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
+import { fechaVisible, resumenHoy } from './cobros'
 import Icono from './Icono'
-import { formatoMoneda } from './moneda'
+import Marcadores from './Marcadores'
+import { formatearMiles, formatoMoneda, leerMonto } from './moneda'
 
 function fechaHoy() {
   const fecha = new Date()
@@ -12,7 +14,7 @@ function fechaHoy() {
   return `${fecha.getFullYear()}-${mes}-${dia}`
 }
 
-export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
+export default function PanelCorredor({ panel, token, onSalir, onActualizar, onPago }) {
   const [modal, setModal] = useState(null)
   const [valor, setValor] = useState('')
   const [fecha, setFecha] = useState(fechaHoy())
@@ -39,7 +41,7 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
   )
   const deudaElegida = deudasCliente.find((item) => item.id === deudaId) || deudasCliente[0]
   const minimo = deudaElegida ? Math.min(Number(deudaElegida.valor_cuota), Number(deudaElegida.saldo)) : 0
-  const pago = Number(String(valor).replace(',', '.'))
+  const pago = leerMonto(valor)
   const esInferior = Number.isFinite(pago) && pago > 0 && pago + 0.009 < minimo
 
   function abrirPago(persona) {
@@ -73,9 +75,18 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
         token,
         datos: {
           deudaId: deudaElegida.id,
-          valor,
+          valor: pago,
           fecha,
         },
+      })
+      onPago?.({
+        deudaId: deudaElegida.id,
+        clienteId: modal.id,
+        valor: resultado.valor ?? pago,
+        fecha,
+        estado: resultado.estado,
+        nombrePersonal: modal.nombre_personal,
+        nombreNegocio: modal.nombre_negocio,
       })
       await onActualizar()
       setModal(null)
@@ -98,6 +109,7 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
       (item) => item.cliente_id === persona.id && item.estado !== 'cancelada' && Number(item.saldo) > 0,
     ),
   )
+  const hoy = resumenHoy(panel?.deudas, panel?.abonos)
 
   return (
     <div className="app-dashboard">
@@ -150,6 +162,16 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
           ) : null}
         </div>
       </header>
+
+      <Marcadores
+        tres
+        moneda={panel?.moneda}
+        items={[
+          ['Cobros totales hoy', hoy.programado],
+          ['Valor recaudado hoy', hoy.recaudado],
+          ['Valor pendiente por cobrar', hoy.pendiente],
+        ]}
+      />
 
       <main className="contenido">
         {aviso ? <p className="aviso">{aviso}</p> : null}
@@ -224,6 +246,37 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
             <p>No hay clientes con deuda en tus rutas.</p>
           )}
         </section>
+
+        <section className="panel lista">
+          <h2>Pagos registrados</h2>
+          {panel.abonos?.length ? (
+            <div className="tabla-contenedor">
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Valor pagado</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {panel.abonos.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{item.nombre_personal}</strong>
+                        <span className="tabla-detalle">{item.nombre_negocio}</span>
+                      </td>
+                      <td>{dinero(item.valor)}</td>
+                      <td>{fechaVisible(item.fecha)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p>Aún no hay pagos registrados.</p>
+          )}
+        </section>
       </main>
 
       {modal ? (
@@ -270,7 +323,7 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
                   inputMode="decimal"
                   value={valor}
                   onChange={(event) => {
-                    setValor(event.target.value)
+                    setValor(formatearMiles(event.target.value))
                     setAvisoInferior(false)
                   }}
                 />
@@ -282,7 +335,7 @@ export default function PanelCorredor({ panel, token, onSalir, onActualizar }) {
             </div>
             {avisoInferior ? (
               <p className="error" role="alert">
-                El pago es inferior al mínimo de {dinero(minimo)}. Si continúas, se restará de la deuda.
+                El pago es inferior al mínimo de {dinero(minimo)}. Si continúas, se restará {dinero(pago)} de la deuda.
               </p>
             ) : null}
             {error ? (

@@ -3,6 +3,7 @@ import {
   Banknote,
   CalendarRange,
   ChevronDown,
+  ClipboardList,
   HandCoins,
   LogOut,
   Pencil,
@@ -17,10 +18,12 @@ import {
 } from 'lucide-react'
 import logo from './assets/logo-gotaapp.png'
 import { pedir } from './api'
-import { pendientes } from './cobros'
+import { fechaVisible, pendientes } from './cobros'
 import Icono from './Icono'
-import { formatoMoneda, MONEDAS } from './moneda'
+import { formatearMiles, formatoMoneda, leerMonto, MONEDAS } from './moneda'
+import Marcadores from './Marcadores'
 import PanelCorredor from './PanelCorredor'
+import { aplicarPago, totales } from './resumen'
 
 function Resumen({ icono, children }) {
   return (
@@ -205,7 +208,8 @@ export default function Dashboard({ token, onSalir }) {
 
   async function crearAbono(event) {
     event.preventDefault()
-    if (!abono.deudaId || !abono.valor || !abono.fecha) {
+    const pagado = leerMonto(abono.valor)
+    if (!abono.deudaId || !Number.isFinite(pagado) || pagado <= 0 || !abono.fecha) {
       setErrorModal('Selecciona la deuda, el valor y la fecha del abono.')
       return
     }
@@ -217,10 +221,22 @@ export default function Dashboard({ token, onSalir }) {
         token,
         datos: {
           deudaId: abono.deudaId,
-          valor: abono.valor,
+          valor: pagado,
           fecha: abono.fecha,
         },
       })
+      const deuda = (panel?.deudas || []).find((item) => item.id === abono.deudaId)
+      setPanel((actual) =>
+        aplicarPago(actual, {
+          deudaId: abono.deudaId,
+          clienteId: deuda?.cliente_id,
+          valor: resultado.valor ?? pagado,
+          fecha: abono.fecha,
+          estado: resultado.estado,
+          nombrePersonal: deuda?.nombre_personal,
+          nombreNegocio: deuda?.nombre_negocio,
+        }),
+      )
       await cargar()
       setModal('')
       setAviso(resultado.estado === 'cancelada' ? 'Deuda cancelada.' : 'Abono registrado.')
@@ -455,9 +471,17 @@ export default function Dashboard({ token, onSalir }) {
     }
   }
 
-  if (panel?.usuario?.rol === 'corredor') {
-    return <PanelCorredor panel={panel} token={token} onSalir={onSalir} onActualizar={cargar} />
+  function reflejarPago(pago) {
+    setPanel((actual) => aplicarPago(actual, pago))
   }
+
+  if (panel?.usuario?.rol === 'corredor') {
+    return (
+      <PanelCorredor panel={panel} token={token} onSalir={onSalir} onActualizar={cargar} onPago={reflejarPago} />
+    )
+  }
+
+  const cifras = totales(panel?.deudas)
 
   return (
     <div className="app-dashboard">
@@ -474,6 +498,16 @@ export default function Dashboard({ token, onSalir }) {
           Salir
         </button>
       </header>
+
+      <Marcadores
+        moneda={panel?.moneda}
+        items={[
+          ['Dinero prestado', cifras.prestado],
+          ['Dinero retornado', cifras.retornado],
+          ['Utilidades actuales', cifras.utilidadActual],
+          ['Proyección de utilidades', cifras.utilidadProyectada],
+        ]}
+      />
 
       <main className="contenido">
         <section className="panel lista lista-desplegable">
@@ -662,6 +696,41 @@ export default function Dashboard({ token, onSalir }) {
 
         <section className="panel lista lista-desplegable">
           <details>
+            <Resumen icono={ClipboardList}>Pagos registrados</Resumen>
+            <div className="lista-cuerpo">
+              {panel?.abonos?.length ? (
+                <div className="tabla-contenedor">
+                  <table className="tabla">
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Valor pagado</th>
+                        <th>Fecha</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {panel.abonos.map((item) => (
+                        <tr key={item.id}>
+                          <td>
+                            <strong>{item.nombre_personal}</strong>
+                            <span className="tabla-detalle">{item.nombre_negocio}</span>
+                          </td>
+                          <td>{dinero(item.valor)}</td>
+                          <td>{fechaVisible(item.fecha)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>Aún no hay pagos registrados.</p>
+              )}
+            </div>
+          </details>
+        </section>
+
+        <section className="panel lista lista-desplegable">
+          <details>
             <Resumen icono={Users}>Clientes</Resumen>
             <div className="lista-cuerpo">
               {panel?.clientes?.length ? (
@@ -683,7 +752,7 @@ export default function Dashboard({ token, onSalir }) {
                         .filter((item) => item.cliente_id === persona.id)
                         .map((item) => (
                           <span key={item.id}>
-                            Abono {dinero(item.valor)} · {item.fecha}
+                            Abono {dinero(item.valor)} · {fechaVisible(item.fecha)}
                           </span>
                         ))}
                       {esAdministrador ? (
@@ -1192,7 +1261,9 @@ export default function Dashboard({ token, onSalir }) {
                   name="valor"
                   inputMode="decimal"
                   value={abono.valor}
-                  onChange={(event) => setAbono((actual) => ({ ...actual, valor: event.target.value }))}
+                  onChange={(event) =>
+                    setAbono((actual) => ({ ...actual, valor: formatearMiles(event.target.value) }))
+                  }
                 />
               </div>
               <div className="field">

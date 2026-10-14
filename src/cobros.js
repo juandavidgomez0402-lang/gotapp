@@ -1,3 +1,9 @@
+export function fechaVisible(iso) {
+  const [anio, mes, dia] = String(iso || '').slice(0, 10).split('-')
+  if (!anio || !mes || !dia) return ''
+  return `${dia}/${mes}/${anio}`
+}
+
 export function isoLocal(fecha = new Date()) {
   const mes = String(fecha.getMonth() + 1).padStart(2, '0')
   const dia = String(fecha.getDate()).padStart(2, '0')
@@ -47,6 +53,38 @@ export function valorEnFecha(deuda, fechaObjetivo) {
     return Math.min(cuota, falta, saldo)
   }
   return 0
+}
+
+export function resumenHoy(deudas, abonos, hoy = isoLocal()) {
+  let programado = 0
+  let pendiente = 0
+  for (const deuda of deudas || []) {
+    const pagosHoy = (abonos || [])
+      .filter((abono) => abono.deuda_id === deuda.id && String(abono.fecha).slice(0, 10) === hoy)
+      .reduce((suma, abono) => suma + Number(abono.valor || 0), 0)
+    const abonado = Number(deuda.total_abonado || 0)
+    const previo = Math.max(0, Math.round((abonado - pagosHoy) * 100) / 100)
+    const saldoPrevio = Math.round((Number(deuda.saldo || 0) + pagosHoy) * 100) / 100
+    programado += valorEnFecha(
+      {
+        ...deuda,
+        total_abonado: previo,
+        saldo: saldoPrevio,
+        estado: saldoPrevio > 0.009 ? 'activa' : deuda.estado,
+      },
+      hoy,
+    )
+    pendiente += valorEnFecha(deuda, hoy)
+  }
+  const recaudado = (abonos || [])
+    .filter((abono) => String(abono.fecha).slice(0, 10) === hoy)
+    .reduce((suma, abono) => suma + Number(abono.valor || 0), 0)
+  const redondear = (numero) => Math.round(numero * 100) / 100
+  return {
+    programado: redondear(programado),
+    recaudado: redondear(recaudado),
+    pendiente: redondear(pendiente),
+  }
 }
 
 export function pendientes(deudas, filtro, hoy = isoLocal()) {
